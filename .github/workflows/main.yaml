@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    tags:   # pentru prod
+      - '*' 
 
 jobs:
   build:
@@ -20,20 +22,21 @@ jobs:
   integration:
     needs: test
     runs-on: ubuntu-22.04
-    continue-on-error: true
+    continue-on-error: true   # permite jobului să dea fail fără să oprească workflow
     steps:
       - run: echo "This is an integration step"
       - run: exit 1
 
   prod:
     needs: integration
-    if: startsWith(github.ref, 'refs/tags/')
+    if: startsWith(github.ref, 'refs/tags/')   # rulează doar la push de tag
     runs-on: ubuntu-22.04
     steps:
       - run: echo "This is a deploy step"
 
   artifact:
     needs: integration
+    if: always()   # rulează indiferent dacă integration a eșuat
     runs-on: ubuntu-22.04
     steps:
       - run: echo "hello" > hello.txt
