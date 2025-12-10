@@ -1,61 +1,68 @@
-name: Django
-
-on:
-  push:
-    branches:
-      - main
-    tags:   # pentru prod
-      - '*' 
-
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    docker:
+      - image: python:3.6                   # similar to "image" in GitLab
     steps:
-      - run: echo "This is a build step"
+      - checkout
+      - run: |                              # similar to "script" in GitLab
+          pip install -r requirements.txt
+          python manage.py check
 
   test:
-    needs: build
-    runs-on: ubuntu-22.04
+    docker:
+      - image: python:3.6
     steps:
-      - run: echo "This is a test step"
+      - checkout
+      - run: |
+          pip install -r requirements.txt
+          python manage.py test taskManager
 
   oast:
-    runs-on: ubuntu-22.04
-    needs: test
+    machine: true
     steps:
-      - uses: actions/checkout@v2
+      - checkout
 
-      - run: docker run --rm -v $(pwd):/src hysnsec/safety check -r requirements.txt --json > oast-results.json
-        continue-on-error: true
+      - run:
+          command: docker run -v $(pwd):/src --rm hysnsec/safety check -r /src/requirements.txt --json | tee oast-results.json || true
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: Safety
+      - store_artifacts:
           path: oast-results.json
-        if: always()                        # what is this for?
+          destination: safety-artifact
+          when: always
 
   integration:
-    needs: test
-    runs-on: ubuntu-22.04
+    docker:
+      - image: python:3.6
     steps:
-      - run: echo "This is an integration step"
-      - run: exit 1
-    continue-on-error: true   # permite jobului să dea fail fără să oprească workflow
+      - checkout
+      - run:
+          command: |
+            echo "This is an integration step"
+            exit 1
+          when: on_fail                    # Even if the job fails, continue to the next stages
 
   prod:
-    needs: integration
-    if: startsWith(github.ref, 'refs/tags/')   # rulează doar la push de tag
-    runs-on: ubuntu-22.04
+    docker:
+      - image: python:3.6
     steps:
+      - checkout
       - run: echo "This is a deploy step"
 
-  artifact:
-    needs: integration
-    if: always()   # rulează indiferent dacă integration a eșuat
-    runs-on: ubuntu-22.04
-    steps:
-      - run: echo "hello" > hello.txt
-      - uses: actions/upload-artifact@v4
-        with:
-          name: hello-artifact
-          path: hello.txt
+workflows:
+  version: 2
+  django:
+    jobs:
+      - build
+      - test:
+          requires:
+            - build
+      - oast:
+          requires:
+            - test
+      - integration:
+          requires:
+            - oast
+      - prod:
+          type: approval
+          requires:
+            - integration
