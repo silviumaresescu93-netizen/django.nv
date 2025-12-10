@@ -19,6 +19,20 @@ jobs:
     steps:
       - run: echo "This is a test step"
 
+  oast:
+    runs-on: ubuntu-22.04
+    needs: test
+    steps:
+      - uses: actions/checkout@v2
+
+      - run: docker run --rm -v $(pwd):/src hysnsec/safety check -r requirements.txt --json > oast-results.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Safety
+          path: oast-results.json
+        if: always()                        # what is this for?
+
   integration:
     needs: test
     runs-on: ubuntu-22.04
