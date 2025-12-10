@@ -37,10 +37,10 @@ jobs:
   integration:
     needs: test
     runs-on: ubuntu-22.04
-    continue-on-error: true   # permite jobului să dea fail fără să oprească workflow
     steps:
       - run: echo "This is an integration step"
       - run: exit 1
+    continue-on-error: true   # permite jobului să dea fail fără să oprească workflow
 
   prod:
     needs: integration
