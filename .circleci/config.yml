@@ -17,6 +17,18 @@ jobs:
           pip install -r requirements.txt
           python manage.py test taskManager
 
+  sast:
+    machine: true
+    steps:
+      - checkout
+
+      - run: docker run --rm -v $(pwd):/src hysnsec/bandit -r /src -f json -o /src/bandit-output.json || true
+
+      - store_artifacts:
+          path: bandit-output.json
+          destination: bandit-artifact
+          when: always
+
   integration:
     docker:
       - image: python:3.6
@@ -26,6 +38,7 @@ jobs:
           command: |
             echo "This is an integration step"
             exit 1
+          when: on_fail           # Even if the job fails, continue to the next stages
 
   prod:
     docker:
@@ -39,8 +52,15 @@ workflows:
   django:
     jobs:
       - build
-      - test
-      - integration
+      - test:
+          requires:
+            - build
+      - sast:
+          requires:
+            - test
+      - integration:
+          requires:
+            - sast
       - prod:
           type: approval
           requires:
